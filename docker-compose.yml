@@ -1,0 +1,83 @@
+version: '3'
+
+services:
+  config-server:
+    image: alvo/twitter-sentiment-analyzer-config-server
+    hostname: config-server
+    container_name: "config_server"
+    ports:
+      - 8888:8888
+    labels:
+      NAME: "twitter-sentiment-analyzer-config-server"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    tty: true
+
+  rabbitmq:
+    image: alvo/twitter-sentiment-analyzer-rabbitmq
+    container_name: "rabbitmq_sentiment"
+    hostname: rabbitmq
+    ports:
+      - 5672:5672
+      - 15672:15672
+      - 15674:15674
+    labels:
+      NAME: "rabbitmq"
+
+  mongodb:
+    image: mongo:latest
+    container_name: "mongodb"
+    hostname: mongodb
+    environment:
+      - MONGO_DATA_DIR=/data/db
+      - MONGO_LOG_DIR=/dev/null
+      - MONGODB_USER="user"
+      - MONGODB_PASS="mongo"
+    volumes:
+      - ./data/db:/data/db
+    ports:
+      - 27017:27017
+    command: mongod --smallfiles
+
+  sentiment-analyzer:
+    image: alvo/twitter-sentiment-analyzer
+    hostname: sentiment-analyzer
+    container_name: "sentiment_analyzer"
+    ports:
+      - 8080:8080
+    links:
+      - rabbitmq
+      - config-server
+    labels:
+      NAME: "twitter-sentiment-analyzer"
+    tty: true
+
+  sentiment-analyzer-dataproxy:
+    image: alvo/twitter-sentiment-analyzer-dataproxy
+    hostname: twitter-sentiment-analyzer-dataproxy
+    container_name: "sentiment_analyzer_dataproxy"
+    ports:
+      - 8081:8081
+    links:
+      - rabbitmq
+      - mongodb
+      - config-server
+    labels:
+      NAME: "twitter-sentiment-analyzer-dataproxy"
+
+  sentiment-analyzer-frontend:
+    image: alvo/twitter-sentiment-analyzer-frontend
+    hostname: twitter-sentiment-analyzer-frontend
+    container_name: "sentiment-analyzer-frontend"
+    ports:
+      - 80:80
+    links:
+      - rabbitmq
+      - sentiment-analyzer-dataproxy
+      - sentiment-analyzer
+    labels:
+      NAME: "twitter-sentiment-analyzer-frontend"
+    tty: true
